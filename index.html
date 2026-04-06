@@ -1132,57 +1132,80 @@ function init(){
   }
 }
 
-/* ── DATE CHANGED ────────────────────────────────────── */
-function fechaChanged(){
-  saveLocal();
-  if(document.getElementById('servicio').value) cargarSIHO();
-  // Si Drive está conectado, buscar archivo para la nueva fecha
-  if(driveToken) buscarArchivoDrive();
-}
-
 /* ── SERVICE CHANGED ─────────────────────────────────── */
 function servicioChanged(){
   saveLocal();
+
+  // PRIORIDAD 1: Excel ya cargado en memoria → re-filtrar por nuevo servicio
+  if(excelRawRows.length > 0 && window._detectedCols){
+    mostrarPreview(window._detectedCols);
+    const autoLoad = document.getElementById('chkAutoLoad')?.checked ||
+                     document.getElementById('chkAutoLoad2')?.checked;
+    if(autoLoad) confirmarCargaExcel();
+    return;
+  }
+
+  // PRIORIDAD 2: Drive conectado → buscar archivo en Drive
+  if(driveToken){
+    buscarArchivoDrive();
+    return;
+  }
+
+  // PRIORIDAD 3: Sin Drive ni Excel → datos demo (solo para probar la app)
   cargarSIHO();
 }
 
-/* ── LOAD SIHO DATA ──────────────────────────────────── */
+/* ── DATE CHANGED ────────────────────────────────────── */
+function fechaChanged(){
+  saveLocal();
+  // Al cambiar la fecha, limpiar el Excel en memoria (es otro día)
+  excelWorkbook = null; excelRawRows = []; excelHeaders = [];
+  excelPreview  = []; window._detectedCols = null;
+  document.getElementById('previewArea').style.display   = 'none';
+  document.getElementById('sheetSelector').style.display = 'none';
+
+  if(driveToken){
+    buscarArchivoDrive(); // buscar el archivo del nuevo día
+  } else if(document.getElementById('servicio').value){
+    cargarSIHO();
+  }
+}
+
+/* ── LOAD SIHO DATA (modo demo sin Drive) ────────────── */
 function cargarSIHO(){
   const serv = document.getElementById('servicio').value;
   const fecha = document.getElementById('fecha').value;
   if(!serv || !fecha){ return; }
 
+  // Drive tiene prioridad absoluta
+  if(driveToken){ buscarArchivoDrive(); return; }
+
   const statusEl = document.getElementById('sihoStatus');
   const countEl  = document.getElementById('sihoCount');
   const note     = document.getElementById('sihoManualNote');
 
-  // Show loading
   statusEl.className = 'siho-banner warn';
-  statusEl.innerHTML = '<span class="siho-dot dot-yellow"></span> Consultando SIHO...';
+  statusEl.innerHTML = '<span class="siho-dot dot-yellow"></span> Cargando datos de ejemplo…';
 
   setTimeout(() => {
     const demo = SIHO_DEMO[serv];
     if(demo && demo.length > 0){
       pacientes = demo.map((p,i) => ({
-        ...p,
-        gos_original: p.gos,
-        estado: 'presente',
-        destino: '',
-        manual: false,
-        id: 'siho_' + i,
+        ...p, gos_original:p.gos,
+        estado:'presente', destino:'', manual:false, id:'siho_'+i,
       }));
       existencia0hs = pacientes.length;
-      statusEl.className = 'siho-banner ok';
-      statusEl.innerHTML = `<span class="siho-dot dot-green"></span> ${pacientes.length} pacientes cargados del SIHO para ${serv} — ${formatFecha(fecha)}`;
-      countEl.textContent = pacientes.length + ' pacientes';
-      note.style.display = 'none';
-    } else {
-      pacientes = [];
-      existencia0hs = 0;
       statusEl.className = 'siho-banner warn';
-      statusEl.innerHTML = '<span class="siho-dot dot-yellow"></span> Sin datos del SIHO para este servicio. Puede agregar pacientes manualmente.';
-      countEl.textContent = 'Sin datos SIHO';
-      note.style.display = 'block';
+      statusEl.innerHTML = `<span class="siho-dot dot-yellow"></span>
+        ⚠️ Datos de EJEMPLO para ${serv}. Conectá Google Drive para cargar datos reales del ${formatFecha(fecha)}.`;
+      countEl.textContent = pacientes.length + ' (demo)';
+      note.style.display  = 'none';
+    } else {
+      pacientes = []; existencia0hs = 0;
+      statusEl.className = 'siho-banner idle';
+      statusEl.innerHTML = '<span class="siho-dot dot-gray"></span> Sin datos para este servicio. Conectá Drive o agregá pacientes con "+ Agregar".';
+      countEl.textContent = 'Sin datos';
+      note.style.display  = 'block';
     }
 
     renderPatients();
@@ -1191,7 +1214,7 @@ function cargarSIHO(){
     document.getElementById('totalesCard').style.display  = 'block';
     document.getElementById('envioCard').style.display    = 'block';
     actualizarTotales();
-  }, 600);
+  }, 400);
 }
 
 /* ── RENDER PATIENTS ─────────────────────────────────── */
