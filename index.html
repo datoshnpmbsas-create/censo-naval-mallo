@@ -205,6 +205,21 @@
     .sb-a.on{background:var(--pase);border-color:var(--pase);color:#fff}
     .sb-f{background:#fffbeb;border-color:var(--fall-border);color:#b45309}
     .sb-f.on{background:var(--fall);border-color:var(--fall);color:#fff}
+    .sb-pd{background:#f5f3ff;border-color:#c4b5fd;color:#6d28d9}
+    .sb-pd.on{background:#7c3aed;border-color:#7c3aed;color:#fff}
+
+    tbody tr.row-pd{background:#f5f3ff}
+    .pase-origen{
+      margin-top:4px;padding:4px 7px;
+      border:1.5px solid #c4b5fd;border-radius:6px;
+      font-size:.75rem;width:100px;text-transform:uppercase;color:#6d28d9;
+    }
+    .hoja-badge{
+      display:inline-block;padding:2px 8px;border-radius:20px;
+      font-size:.68rem;font-weight:700;margin-left:4px;
+    }
+    .hoja-int{background:#dcfce7;color:#14532d}
+    .hoja-mov{background:#e0e7ff;color:#3730a3}
 
     .pase-dest{
       margin-top:4px;padding:4px 7px;
@@ -1259,14 +1274,23 @@ function renderPatients(){
           : ''}
       </div>`;
 
-    // Pase A dest input
-    const pasteDestHtml = p.estado === 'pase_a'
-      ? `<br><input class="pase-dest" type="text" placeholder="Destino (UTI, CG…)"
-           value="${p.destino||''}" oninput="setDestino(${idx},this.value)">`
-      : '';
+    // Inputs extra según estado
+    let extraHtml = '';
+    if(p.estado === 'pase_a'){
+      extraHtml = `<br><input class="pase-dest" type="text" placeholder="Destino (UTI, CG…)"
+        value="${p.destino||''}" oninput="setDestino(${idx},this.value)">`;
+    } else if(p.estado === 'pase_de'){
+      extraHtml = `<br><input class="pase-origen" type="text" placeholder="Origen (UTI, CG…)"
+        value="${p.origen||''}" oninput="setOrigen(${idx},this.value)">`;
+    }
 
     tr.innerHTML = `
-      <td><span style="font-size:.75rem;color:var(--muted)">${cama}</span>${p.manual?'<span class="td-manual-badge">MANUAL</span>':''}</td>
+      <td>
+        <span style="font-size:.75rem;color:var(--muted)">${p.cama||String(idx+1).padStart(3,'0')}</span>
+        ${p.manual ? '<span class="td-manual-badge">MANUAL</span>' : ''}
+        ${p.fuente==='movimientos' ? '<span class="hoja-badge hoja-mov">MOV</span>' : ''}
+        ${p.fuente==='internados'  ? '<span class="hoja-badge hoja-int">INT</span>'  : ''}
+      </td>
       <td class="td-oi">${p.oi}</td>
       <td class="td-name">${p.nom}</td>
       <td class="td-diag">${p.diag||''}</td>
@@ -1274,12 +1298,13 @@ function renderPatients(){
       <td style="text-align:center;font-size:.8rem">${p.dias||'—'}</td>
       <td>
         <div class="status-btns">
-          <button class="sb sb-p${p.estado==='presente'?' on':''}"  onclick="setEstado(${idx},'presente')">✓ Presente</button>
-          <button class="sb sb-e${p.estado==='egreso'?' on':''}"    onclick="setEstado(${idx},'egreso')">✗ Egreso</button>
-          <button class="sb sb-a${p.estado==='pase_a'?' on':''}"    onclick="setEstado(${idx},'pase_a')">→ Pase A</button>
+          <button class="sb sb-p${p.estado==='presente'?' on':''}"   onclick="setEstado(${idx},'presente')">✓ Pres.</button>
+          <button class="sb sb-e${p.estado==='egreso'?' on':''}"     onclick="setEstado(${idx},'egreso')">✗ Egreso</button>
+          <button class="sb sb-a${p.estado==='pase_a'?' on':''}"     onclick="setEstado(${idx},'pase_a')">→ PA</button>
+          <button class="sb sb-pd${p.estado==='pase_de'?' on':''}"   onclick="setEstado(${idx},'pase_de')">← PD</button>
           <button class="sb sb-f${p.estado==='fallecimiento'?' on':''}" onclick="setEstado(${idx},'fallecimiento')">✝ Fall.</button>
         </div>
-        ${pasteDestHtml}
+        ${extraHtml}
       </td>
     `;
     tbody.appendChild(tr);
@@ -1298,6 +1323,7 @@ function rowClass(p){
   switch(p.estado){
     case 'egreso':       return 'row-egreso';
     case 'pase_a':       return 'row-pase';
+    case 'pase_de':      return 'row-pd';
     case 'fallecimiento':return 'row-fall';
     default:             return p.manual ? 'row-manual' : 'row-presente';
   }
@@ -1332,9 +1358,15 @@ function setEstado(idx, estado){
   renderPatients();
 }
 
-/* ── SET DESTINO PASE ────────────────────────────────── */
+/* ── SET DESTINO (Pase A) ────────────────────────────── */
 function setDestino(idx, val){
   pacientes[idx].destino = val.toUpperCase();
+  actualizarTotales();
+}
+
+/* ── SET ORIGEN (Pase De) ────────────────────────────── */
+function setOrigen(idx, val){
+  pacientes[idx].origen = val.toUpperCase();
   actualizarTotales();
 }
 
@@ -1455,9 +1487,10 @@ function actualizarTotales(){
   const egr    = pacientes.filter(p => p.estado === 'egreso').length;
   const pe     = pacientes.filter(p => p.estado === 'pase_a').length;
   const fall   = pacientes.filter(p => p.estado === 'fallecimiento').length;
+  const pd     = pacientes.filter(p => p.estado === 'pase_de').length;
 
   const ingresos = pacientes.filter(p => p.manual && p.motivo === 'ingreso').length;
-  const pasesDe  = pacientes.filter(p => p.manual && p.motivo === 'pase_de').length;
+  const pasesDe  = pd + pacientes.filter(p => p.manual && p.motivo === 'pase_de').length;
 
   const ex0  = existencia0hs;
   const ex24 = ex0 + ingresos + pasesDe - egr - pe - fall;
@@ -1489,19 +1522,26 @@ function enviarCenso(){
   if(!sec)   { alert('⚠️ Ingrese el nombre del secretario/a.'); return; }
   if(pacientes.length === 0){ if(!confirm('No hay pacientes cargados. ¿Desea enviar el censo igualmente?')) return; }
 
-  // Validate pase_a destinations
+  // Validar Pase A sin destino
   const pasSinDest = pacientes.filter(p => p.estado === 'pase_a' && !p.destino);
   if(pasSinDest.length > 0){
-    alert(`⚠️ ${pasSinDest.length} paciente(s) con Pase A sin servicio destino. Complete el campo antes de enviar.`);
+    alert(`⚠️ ${pasSinDest.length} paciente(s) con Pase A (→ PA) sin servicio destino. Complete el campo antes de enviar.`);
+    return;
+  }
+  // Validar Pase De sin origen
+  const pdSinOrigen = pacientes.filter(p => p.estado === 'pase_de' && !p.origen);
+  if(pdSinOrigen.length > 0){
+    alert(`⚠️ ${pdSinOrigen.length} paciente(s) con Pase Desde (← PD) sin servicio origen. Complete el campo antes de enviar.`);
     return;
   }
 
   const pres  = pacientes.filter(p => p.estado === 'presente').length;
   const egr   = pacientes.filter(p => p.estado === 'egreso').length;
   const pe    = pacientes.filter(p => p.estado === 'pase_a').length;
+  const pd    = pacientes.filter(p => p.estado === 'pase_de').length;
   const fall  = pacientes.filter(p => p.estado === 'fallecimiento').length;
   const ingresos = pacientes.filter(p => p.manual && p.motivo === 'ingreso').length;
-  const pasesDe  = pacientes.filter(p => p.manual && p.motivo === 'pase_de').length;
+  const pasesDe  = pd + pacientes.filter(p => p.manual && p.motivo === 'pase_de').length;
   const ex24 = existencia0hs + ingresos + pasesDe - egr - pe - fall;
 
   const dibaCorrected = pacientes.filter(p => p.gos_original === 'DIBA' && p.gos === 'DISA').length;
@@ -1538,7 +1578,8 @@ function enviarCenso(){
     <strong>Servicio:</strong> ${serv} — ${record.servDesc}<br>
     <strong>Secretario/a:</strong> ${sec}<br>
     <strong>Existencia 0hs:</strong> ${existencia0hs} | <strong>Existencia 24hs:</strong> ${ex24}<br>
-    <strong>Presentes:</strong> ${pres} · <strong>Egresos:</strong> ${egr} · <strong>Pases A:</strong> ${pe} · <strong>Fallecimientos:</strong> ${fall}<br>
+    <strong>✓ Presentes:</strong> ${pres} · <strong>✗ Egresos:</strong> ${egr} · <strong>→ PA:</strong> ${pe} · <strong>← PD:</strong> ${pd} · <strong>✝ Fall.:</strong> ${fall}<br>
+    ${ingresos > 0 ? `<strong>Ingresos del día:</strong> ${ingresos}<br>` : ''}
     ${dibaCorrected > 0 ? `<strong>DIBA→DISA corregidos:</strong> ${dibaCorrected}<br>` : ''}
     <strong>Enviado:</strong> ${new Date().toLocaleString('es-AR')}
   `;
@@ -1748,7 +1789,14 @@ function leerExcel(file){
     try{
       excelWorkbook = XLSX.read(ev.target.result, {type:'array', cellDates:true});
       const sheets  = excelWorkbook.SheetNames;
-      if(sheets.length === 1){
+
+      // Detectar automáticamente hojas Internados y Movimientos
+      const hojaInt = sheets.find(s => /INTERN|INTERNADO|PACIENTE|CAMA/i.test(s));
+      const hojaMov = sheets.find(s => /MOV|MOVIM|NOVEDAD|EGRESO|INGRESO|ALTA/i.test(s));
+
+      if(hojaInt && hojaMov){
+        cruzarHojas(hojaInt, hojaMov);
+      } else if(sheets.length === 1){
         procesarHoja(sheets[0]);
       } else {
         const sel = document.getElementById('sheetSelect');
@@ -1765,6 +1813,116 @@ function leerExcel(file){
 
 function onSheetChange(){
   procesarHoja(document.getElementById('sheetSelect').value);
+}
+
+/* ── CRUCE DE HOJAS: Internados + Movimientos ─────────
+   Internados  = pacientes al inicio del día (existencia 0hs)
+   Movimientos = ingresos/pases recibidos del día
+   Resultado   = lista unificada por OI, sin duplicados
+   ──────────────────────────────────────────────────── */
+function cruzarHojas(nombreInt, nombreMov){
+  function parsearHoja(nombre){
+    const ws   = excelWorkbook.Sheets[nombre];
+    const data = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+    if(!data || data.length < 2) return {headers:[], rows:[], detected:{}};
+    let hr = 0;
+    for(let i=0;i<Math.min(15,data.length);i++){
+      if(data[i].filter(c=>String(c||'').trim()!=='').length>=3){hr=i;break;}
+    }
+    const headers  = data[hr].map(h=>String(h||'').trim());
+    const rows     = data.slice(hr+1).filter(r=>r.some(c=>String(c||'').trim()!==''));
+    const detected = {};
+    for(const [campo, candidatos] of Object.entries(COL_MAP)){
+      const col = findCol(headers, candidatos);
+      if(col) detected[campo] = col;
+    }
+    return {headers, rows, detected};
+  }
+
+  const int = parsearHoja(nombreInt);
+  const mov = parsearHoja(nombreMov);
+
+  if(!int.detected.oi && !int.detected.nom && !mov.detected.oi && !mov.detected.nom){
+    procesarHoja(nombreInt);
+    return;
+  }
+
+  const det = Object.assign({}, mov.detected, int.detected);
+
+  function getVal(row, headers, col){
+    if(!col) return '';
+    const idx = headers.indexOf(col);
+    return idx >= 0 ? String(row[idx]||'').trim() : '';
+  }
+
+  // Pacientes de Internados → existencia 0hs
+  const mapaInt = new Map();
+  int.rows.forEach((row, i) => {
+    const oi  = getVal(row, int.headers, int.detected.oi  || det.oi);
+    const nom = getVal(row, int.headers, int.detected.nom || det.nom).toUpperCase();
+    if(!oi && !nom) return;
+    const key = oi || nom;
+    mapaInt.set(key, {
+      oi, nom,
+      gos : getVal(row, int.headers, int.detected.gos  || det.gos).toUpperCase() || 'S/D',
+      diag: getVal(row, int.headers, int.detected.diag || det.diag),
+      serv: getVal(row, int.headers, int.detected.serv || det.serv).toUpperCase(),
+      cama: getVal(row, int.headers, int.detected.cama || det.cama),
+      dias: parseInt(getVal(row, int.headers, int.detected.dias || det.dias))||0,
+      fuente:'internados', estado:'presente', destino:'', origen:'', manual:false, id:'int_'+i,
+    });
+  });
+
+  // Pacientes de Movimientos que NO están en Internados → llegaron hoy
+  const nuevos = [];
+  mov.rows.forEach((row, i) => {
+    const oi  = getVal(row, mov.headers, mov.detected.oi  || det.oi);
+    const nom = getVal(row, mov.headers, mov.detected.nom || det.nom).toUpperCase();
+    if(!oi && !nom) return;
+    const key = oi || nom;
+    if(!mapaInt.has(key)){
+      nuevos.push({
+        oi, nom,
+        gos : getVal(row, mov.headers, mov.detected.gos  || det.gos).toUpperCase() || 'S/D',
+        diag: getVal(row, mov.headers, mov.detected.diag || det.diag),
+        serv: getVal(row, mov.headers, mov.detected.serv || det.serv).toUpperCase(),
+        cama: getVal(row, mov.headers, mov.detected.cama || det.cama),
+        dias: parseInt(getVal(row, mov.headers, mov.detected.dias || det.dias))||0,
+        fuente:'movimientos', estado:'presente', destino:'', origen:'', manual:false, id:'mov_'+i,
+      });
+    }
+  });
+
+  const todos = [...mapaInt.values(), ...nuevos].map(p=>({...p, gos_original:p.gos}));
+
+  window._detectedCols = det;
+  excelRawRows = [];
+
+  // Filtrar por servicio si está seleccionado
+  const servicio = norm(document.getElementById('servicio').value);
+  let filtrados = todos;
+  if(servicio && det.serv){
+    const porServ = todos.filter(p=>norm(p.serv).includes(servicio)||servicio.includes(norm(p.serv)));
+    if(porServ.length > 0) filtrados = porServ;
+  }
+
+  pacientes     = filtrados;
+  existencia0hs = filtrados.filter(p=>p.fuente==='internados').length;
+
+  document.getElementById('sihoStatus').className = 'siho-banner ok';
+  document.getElementById('sihoStatus').innerHTML =
+    `<span class="siho-dot dot-green"></span>
+     <strong>${nombreInt}</strong>: ${mapaInt.size} internados +
+     <strong>${nombreMov}</strong>: ${nuevos.length} nuevos del día
+     = <strong>${filtrados.length} pacientes</strong>`;
+  document.getElementById('sihoCount').textContent = filtrados.length + ' pacientes';
+  document.getElementById('sheetSelector').style.display = 'none';
+
+  renderPatients();
+  ['patientCard','camasCard','totalesCard','envioCard']
+    .forEach(id=>document.getElementById(id).style.display='block');
+  actualizarTotales();
+  document.getElementById('patientCard').scrollIntoView({behavior:'smooth',block:'start'});
 }
 
 function procesarHoja(nombreHoja){
