@@ -433,6 +433,70 @@
       .card{box-shadow:none;border:1px solid #ccc}
       body{background:#fff}
     }
+
+    /* ── MODO SECRETARIO: ocultar Paso 2 ── */
+    body.modo-secretario #step2Card { display: none !important; }
+    body.modo-secretario #tabsNav .tab:nth-child(3),   /* bio */
+    body.modo-secretario #tabsNav .tab:nth-child(4) { display: none; } /* info */
+
+    /* ── LOGIN OVERLAY ── */
+    #loginOverlay{
+      position:fixed;inset:0;
+      background:linear-gradient(135deg,var(--navy-dark) 0%,var(--navy) 55%,var(--navy-light) 100%);
+      z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;
+    }
+    #loginOverlay.oculto{ display:none; }
+    .login-box{
+      background:#fff;border-radius:20px;padding:36px 32px;
+      max-width:420px;width:100%;text-align:center;
+      box-shadow:0 20px 60px rgba(0,0,0,.35);
+    }
+    .login-logo{
+      width:72px;height:72px;background:var(--navy);border-radius:50%;
+      display:flex;align-items:center;justify-content:center;
+      font-size:32px;margin:0 auto 16px;box-shadow:0 4px 12px rgba(0,51,102,.4);
+    }
+    .login-box h2{font-size:1.25rem;font-weight:800;color:var(--navy);margin-bottom:4px}
+    .login-box p{font-size:.82rem;color:var(--muted);margin-bottom:24px}
+    .login-tabs{display:flex;gap:6px;margin-bottom:20px;background:var(--bg);border-radius:10px;padding:4px}
+    .login-tab{
+      flex:1;padding:8px;border-radius:8px;border:none;cursor:pointer;
+      font-size:.82rem;font-weight:700;color:var(--muted);background:transparent;transition:all .2s;
+    }
+    .login-tab.on{background:#fff;color:var(--navy);box-shadow:0 1px 4px rgba(0,0,0,.12)}
+    .login-campo{ margin-bottom:14px;text-align:left; }
+    .login-campo label{display:block;font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:5px}
+    .login-campo input{
+      width:100%;border:2px solid var(--border);border-radius:10px;
+      padding:11px 14px;font-size:.95rem;color:var(--text);
+      transition:border-color .2s;
+    }
+    .login-campo input:focus{outline:none;border-color:var(--navy)}
+    .login-error{
+      background:#fee2e2;border:1px solid #fca5a5;border-radius:8px;
+      padding:9px 14px;font-size:.82rem;color:#b91c1c;font-weight:600;
+      margin-bottom:12px;display:none;
+    }
+    .login-error.show{display:block}
+    #loginDriveNote{
+      background:#f0f7ff;border:1px solid #93c5fd;border-radius:8px;
+      padding:10px 14px;font-size:.78rem;color:var(--navy);margin-top:12px;display:none;
+    }
+    /* ── BADGE usuario logueado en header ── */
+    .user-badge{
+      background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);
+      border-radius:8px;padding:5px 12px;font-size:.75rem;font-weight:700;
+      color:#fff;display:flex;align-items:center;gap:6px;
+    }
+    /* ── TABLA SECRETARIOS EN PANEL BIO ── */
+    .sec-row{
+      display:flex;align-items:center;justify-content:space-between;
+      background:var(--bg);border:1px solid var(--border);border-radius:8px;
+      padding:10px 14px;margin-bottom:6px;gap:10px;flex-wrap:wrap;
+    }
+    .sec-info{font-size:.85rem;font-weight:700;color:var(--text)}
+    .sec-meta{font-size:.72rem;color:var(--muted);margin-top:2px}
+    .sec-actions{display:flex;gap:6px;flex-shrink:0}
   </style>
 </head>
 <body>
@@ -448,10 +512,15 @@
       </div>
     </div>
     <div class="flex" style="gap:8px;flex-shrink:0">
-      <span class="header-badge">v1.0 · Abr 2026</span>
+      <span class="header-badge" id="versionBadge">v1.0 · Abr 2026</span>
+      <div id="userBadge" style="display:none" class="user-badge">
+        <span id="userBadgeIcon">👤</span>
+        <span id="userBadgeName"></span>
+      </div>
       <div class="header-actions">
         <button class="btn-icon" onclick="imprimirCenso()">🖨️ Imprimir</button>
         <button class="btn-icon" onclick="exportarJSON()">⬇️ Exportar</button>
+        <button class="btn-icon" id="btnLogout" style="display:none;background:rgba(220,38,38,.3)" onclick="logout()">⏻ Salir</button>
       </div>
     </div>
   </div>
@@ -500,7 +569,7 @@
     </div>
 
     <!-- STEP 2: SIHO STATUS -->
-    <div class="card fade-up">
+    <div class="card fade-up" id="step2Card">
       <div class="card-header">
         <div class="step-badge">2</div>
         <h2>Carga del SIHO</h2>
@@ -944,6 +1013,49 @@
       <div id="bioDetalle"></div>
     </div>
 
+    <!-- GESTIÓN SECRETARIOS AUTORIZADOS -->
+    <div class="card fade-up" id="panelSecretarios">
+      <div class="card-header">
+        <h2>🔐 Secretarios Autorizados</h2>
+        <button class="btn btn-ghost btn-sm ml-auto" onclick="renderPanelSecretarios()">↺ Actualizar</button>
+      </div>
+      <div style="font-size:.82rem;color:var(--muted);margin-bottom:12px">
+        Solo vos podés agregar o quitar secretarios. Los cambios se guardan en Drive (<code>secretarios_autorizados.json</code>).
+      </div>
+      <div id="secListado" style="margin-bottom:16px">
+        <div style="color:var(--muted);font-size:.82rem">
+          Conectá Google Drive para ver y gestionar la lista.
+        </div>
+      </div>
+      <!-- Agregar nuevo secretario -->
+      <div style="background:#f0f7ff;border:1.5px solid #93c5fd;border-radius:10px;padding:16px">
+        <div style="font-weight:700;color:var(--navy);font-size:.88rem;margin-bottom:12px">➕ Agregar Secretario</div>
+        <div class="form-grid-3">
+          <div class="form-group">
+            <label>N° Legajo *</label>
+            <input type="text" id="secLegajo" placeholder="Ej: 12345">
+          </div>
+          <div class="form-group">
+            <label>Apellido y Nombre *</label>
+            <input type="text" id="secNombre" placeholder="Ej: GARCIA MARIA">
+          </div>
+          <div class="form-group">
+            <label>Servicio asignado</label>
+            <select id="secServicio">
+              <option value="">— Todos los servicios —</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Contraseña *</label>
+            <input type="password" id="secPassword" placeholder="Mínimo 6 caracteres">
+          </div>
+          <div class="form-group" style="align-self:flex-end">
+            <button class="btn btn-navy btn-full" onclick="agregarSecretario()">✔ Agregar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- EMAILS DEL EQUIPO -->
     <div class="card fade-up">
       <div class="card-header">
@@ -1047,6 +1159,63 @@
   Los datos se guardan localmente en este navegador. Contacto: datosbsas@gmail.com
 </footer>
 
+<!-- ══ LOGIN OVERLAY ════════════════════════════════════ -->
+<div id="loginOverlay">
+  <div class="login-box">
+    <div class="login-logo">⚓</div>
+    <h2>Censo Diario Digital</h2>
+    <p>Hospital Naval Cirujano Mayor Dr. Pedro Mallo</p>
+
+    <!-- Tabs login -->
+    <div class="login-tabs">
+      <button class="login-tab on" id="ltSecretario" onclick="setLoginTab('secretario')">👤 Secretario/a</button>
+      <button class="login-tab"  id="ltAdmin"      onclick="setLoginTab('admin')">🔑 Bioestadística</button>
+    </div>
+
+    <!-- Panel secretario -->
+    <div id="loginPanelSecretario">
+      <div class="login-campo">
+        <label>N° Legajo</label>
+        <input type="text" id="loginLegajo" placeholder="Ej: 12345"
+               onkeydown="if(event.key==='Enter')document.getElementById('loginPass').focus()">
+      </div>
+      <div class="login-campo">
+        <label>Contraseña</label>
+        <input type="password" id="loginPass" placeholder="Tu contraseña"
+               onkeydown="if(event.key==='Enter')loginSecretario()">
+      </div>
+      <div class="login-error" id="loginError">Legajo o contraseña incorrectos.</div>
+      <div id="loginDriveNote">
+        🔗 Esta app necesita acceso a Google Drive para leer el censo del día.<br>
+        <button class="btn btn-navy btn-sm btn-full" style="margin-top:8px" onclick="conectarDriveParaSecretario()">
+          <img src="https://www.google.com/favicon.ico" width="14" height="14" style="border-radius:2px">
+          Conectar Google Drive
+        </button>
+      </div>
+      <button class="btn btn-navy btn-lg btn-full" style="margin-top:4px" onclick="loginSecretario()">
+        Ingresar
+      </button>
+      <div style="font-size:.72rem;color:var(--muted);margin-top:14px">
+        ¿No tenés acceso? Contactá a Bioestadística: datosbsas@gmail.com
+      </div>
+    </div>
+
+    <!-- Panel admin -->
+    <div id="loginPanelAdmin" style="display:none">
+      <div style="font-size:.85rem;color:var(--muted);margin-bottom:16px">
+        El acceso de Bioestadística se realiza mediante Google (cuenta autorizada).
+      </div>
+      <button class="btn btn-navy btn-lg btn-full" onclick="conectarDriveAdmin()">
+        <img src="https://www.google.com/favicon.ico" width="16" height="16" style="border-radius:2px">
+        Iniciar sesión con Google
+      </button>
+      <div style="font-size:.72rem;color:var(--muted);margin-top:14px">
+        Solo cuentas autorizadas tienen acceso al panel completo.
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ══ JAVASCRIPT ══════════════════════════════════════ -->
 <script>
 'use strict';
@@ -1121,28 +1290,45 @@ let existencia0hs = 0;
 
 /* ── INIT ────────────────────────────────────────────── */
 function init(){
-  // Populate service dropdown
-  const sel = document.getElementById('servicio');
-  SERVICIOS.forEach(s => {
-    const o = document.createElement('option');
-    o.value = s.c;
-    o.textContent = `${s.c} — ${s.n}`;
-    sel.appendChild(o);
+  // Populate service dropdowns (main + admin panel)
+  ['servicio','secServicio'].forEach(id => {
+    const sel = document.getElementById(id);
+    if(!sel) return;
+    SERVICIOS.forEach(s => {
+      const o = document.createElement('option');
+      o.value = s.c;
+      o.textContent = id === 'secServicio' ? `${s.c} — ${s.n}` : `${s.c} — ${s.n}`;
+      sel.appendChild(o);
+    });
   });
+
   // Default date = yesterday
   const hoy = new Date();
   hoy.setDate(hoy.getDate() - 1);
   document.getElementById('fecha').value = hoy.toISOString().slice(0,10);
+
   // Restore form & config
   restoreLocal();
   restaurarConfig();
   renderHistorial();
+
   // Init Google Drive (espera a que cargue el SDK)
-  if(window.google && window.google.accounts){
+  const initDriveYLogin = () => {
     initGoogleDrive();
+    // Después de intentar restaurar token Drive, chequear sesión
+    setTimeout(() => {
+      if(!verificarSesion()){
+        // Sin sesión activa → mostrar login
+        document.getElementById('loginOverlay').classList.remove('oculto');
+      }
+    }, 1200);
+  };
+
+  if(window.google && window.google.accounts){
+    initDriveYLogin();
   } else {
     window.addEventListener('load', () => {
-      setTimeout(initGoogleDrive, 800);
+      setTimeout(initDriveYLogin, 800);
     });
   }
 }
@@ -2351,6 +2537,25 @@ function onTokenResponse(resp){
     mostrarDriveConectado();
     buscarArchivoDrive();
     cargar10Dias();
+
+    // ── Determinar modo según el contexto ──
+    const overlay = document.getElementById('loginOverlay');
+    const estaEnLogin = overlay && !overlay.classList.contains('oculto');
+
+    if(estaEnLogin){
+      if(loginTabActual === 'admin'){
+        // Modo admin: cualquier cuenta que se loguee puede gestionar
+        currentUser = {rol:'admin', nombre: driveUser.name, email: driveUser.email};
+        sessionStorage.setItem('censo_user', JSON.stringify(currentUser));
+        aplicarModo('admin');
+      } else {
+        // Está en tab secretario → volver a intentar login ahora que tiene Drive
+        loginSecretario();
+      }
+    } else if(currentUser?.rol === 'secretario'){
+      // Drive se reconectó para un secretario ya logueado
+      aplicarModo('secretario');
+    }
   })
   .catch(()=>{
     mostrarDriveConectado();
@@ -2419,9 +2624,10 @@ async function buscarArchivoDrive(){
         ? new Date(files[0].modifiedTime).toLocaleString('es-AR') : '';
       setDriveArchivoUI('encontrado', driveFileNombre, `${kb} · Modificado: ${mod}`);
 
-      // Auto-carga si está activada
+      // Auto-carga si está activada o si estamos en modo secretario
       const autoLoad = document.getElementById('chkAutoLoad')?.checked ||
-                       document.getElementById('chkAutoLoad2')?.checked;
+                       document.getElementById('chkAutoLoad2')?.checked ||
+                       window._modoSecretario_autoCargar;
       if(autoLoad) cargarArchivoDrive();
     } else {
       driveFileId = null;
@@ -2729,8 +2935,320 @@ function setTab(name){
   if(name==='bio'){
     renderBioPanel();
     renderEmails();
+    renderPanelSecretarios();
   }
 }
+
+/* ══════════════════════════════════════════════════════
+   SISTEMA DE LOGIN Y ROLES
+   ══════════════════════════════════════════════════════ */
+
+const ADMIN_EMAIL       = 'datosbsas@gmail.com';  // email del administrador
+const SECRETARIOS_JSON  = 'secretarios_autorizados.json';
+
+let currentUser   = null;   // {legajo, nombre, servicio, rol:'secretario'|'admin'}
+let loginTabActual = 'secretario';
+
+/* ── Hash SHA-256 de una contraseña ── */
+async function hashPassword(pass){
+  const enc  = new TextEncoder().encode(pass);
+  const hash = await crypto.subtle.digest('SHA-256', enc);
+  return Array.from(new Uint8Array(hash))
+              .map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
+/* ── Tabs del login ── */
+function setLoginTab(tab){
+  loginTabActual = tab;
+  document.getElementById('ltSecretario').classList.toggle('on', tab==='secretario');
+  document.getElementById('ltAdmin').classList.toggle('on', tab==='admin');
+  document.getElementById('loginPanelSecretario').style.display = tab==='secretario' ? '' : 'none';
+  document.getElementById('loginPanelAdmin').style.display      = tab==='admin'      ? '' : 'none';
+}
+
+/* ── Validar secretario ── */
+async function loginSecretario(){
+  const legajo = (document.getElementById('loginLegajo').value||'').trim();
+  const pass   = (document.getElementById('loginPass').value||'').trim();
+  const errEl  = document.getElementById('loginError');
+  const drNote = document.getElementById('loginDriveNote');
+
+  errEl.classList.remove('show');
+  if(!legajo || !pass){
+    errEl.textContent = 'Ingresá tu legajo y contraseña.';
+    errEl.classList.add('show'); return;
+  }
+
+  // Necesitamos Drive para leer el JSON
+  if(!driveToken){
+    drNote.style.display = 'block';
+    errEl.textContent = 'Primero conectá Google Drive (abajo).';
+    errEl.classList.add('show'); return;
+  }
+
+  errEl.textContent = '🔍 Verificando…'; errEl.classList.add('show');
+  errEl.style.background='#f0f7ff'; errEl.style.color='var(--navy)'; errEl.style.borderColor='#93c5fd';
+
+  try{
+    const lista = await fetchSecretarios();
+    const hash  = await hashPassword(pass);
+    const user  = lista.find(u => String(u.legajo).trim() === String(legajo).trim()
+                                   && u.password_hash === hash);
+    if(!user){
+      errEl.textContent = '⚠️ Legajo o contraseña incorrectos.';
+      errEl.style.background='#fee2e2'; errEl.style.color='#b91c1c'; errEl.style.borderColor='#fca5a5';
+      return;
+    }
+    // Login exitoso
+    currentUser = {...user, rol:'secretario'};
+    sessionStorage.setItem('censo_user', JSON.stringify(currentUser));
+    errEl.classList.remove('show');
+    aplicarModo('secretario');
+  } catch(e){
+    errEl.textContent = '⚠️ Error al verificar credenciales: '+e.message;
+    errEl.style.background='#fee2e2'; errEl.style.color='#b91c1c'; errEl.style.borderColor='#fca5a5';
+  }
+}
+
+/* ── Conectar Drive desde panel secretario ── */
+function conectarDriveParaSecretario(){
+  document.getElementById('loginDriveNote').style.display='none';
+  conectarDrive();
+}
+
+/* ── Conectar Drive desde panel admin ── */
+function conectarDriveAdmin(){
+  conectarDrive();
+}
+
+/* ── Aplicar modo (secretario o admin) ── */
+function aplicarModo(rol){
+  document.getElementById('loginOverlay').classList.add('oculto');
+
+  if(rol === 'secretario'){
+    document.body.classList.add('modo-secretario');
+    document.body.classList.remove('modo-admin');
+    document.getElementById('userBadge').style.display   = 'flex';
+    document.getElementById('userBadgeIcon').textContent = '👤';
+    document.getElementById('userBadgeName').textContent =
+      (currentUser?.nombre||'Secretario') +
+      (currentUser?.servicio ? ' · '+currentUser.servicio : '');
+    document.getElementById('btnLogout').style.display   = 'inline-flex';
+    document.getElementById('versionBadge').style.display = 'none';
+
+    // Si el secretario tiene servicio asignado → preseleccionarlo
+    if(currentUser?.servicio){
+      const sel = document.getElementById('servicio');
+      if(sel && currentUser.servicio) sel.value = currentUser.servicio;
+    }
+    // Auto-buscar en Drive si está conectado
+    if(driveToken && document.getElementById('fecha').value){
+      buscarArchivoDrive();
+    }
+    // En modo secretario, auto-cargar cuando encuentra el archivo
+    window._modoSecretario_autoCargar = true;
+
+  } else {
+    // Modo admin
+    document.body.classList.add('modo-admin');
+    document.body.classList.remove('modo-secretario');
+    document.getElementById('userBadge').style.display   = 'flex';
+    document.getElementById('userBadgeIcon').textContent = '🔑';
+    document.getElementById('userBadgeName').textContent = driveUser?.name || 'Admin';
+    document.getElementById('btnLogout').style.display   = 'inline-flex';
+    document.getElementById('versionBadge').style.display = 'none';
+  }
+}
+
+/* ── Logout ── */
+function logout(){
+  if(!confirm('¿Cerrar sesión?')) return;
+  currentUser = null;
+  sessionStorage.removeItem('censo_user');
+  window._modoSecretario_autoCargar = false;
+  document.body.classList.remove('modo-secretario','modo-admin');
+  document.getElementById('userBadge').style.display    = 'none';
+  document.getElementById('btnLogout').style.display    = 'none';
+  document.getElementById('versionBadge').style.display = 'inline-block';
+  // Mostrar login
+  document.getElementById('loginOverlay').classList.remove('oculto');
+  document.getElementById('loginLegajo').value = '';
+  document.getElementById('loginPass').value = '';
+  document.getElementById('loginError').classList.remove('show');
+}
+
+/* ── Leer lista de secretarios desde Drive ── */
+async function fetchSecretarios(){
+  if(!driveToken) return [];
+  const query = encodeURIComponent(
+    `'${DRIVE_FOLDER_ID}' in parents and trashed=false and name='${SECRETARIOS_JSON}'`
+  );
+  const resp = await fetch(
+    `https://www.googleapis.com/drive/v3/files?q=${query}&fields=files(id,name)`,
+    {headers:{Authorization:'Bearer '+driveToken}}
+  );
+  if(!resp.ok) throw new Error('HTTP '+resp.status);
+  const data = await resp.json();
+  const file = (data.files||[])[0];
+  if(!file) return [];   // aún no existe el archivo
+
+  const dlResp = await fetch(
+    `https://www.googleapis.com/drive/v3/files/${file.id}?alt=media`,
+    {headers:{Authorization:'Bearer '+driveToken}}
+  );
+  if(!dlResp.ok) throw new Error('HTTP '+dlResp.status);
+  const text = await dlResp.text();
+  try{ return JSON.parse(text); } catch(e){ return []; }
+}
+
+/* ── Guardar lista de secretarios en Drive ── */
+async function saveSecretarios(lista){
+  if(!driveToken) return;
+  const content = JSON.stringify(lista, null, 2);
+  const blob    = new Blob([content], {type:'application/json'});
+
+  // Buscar si ya existe
+  const query = encodeURIComponent(
+    `'${DRIVE_FOLDER_ID}' in parents and trashed=false and name='${SECRETARIOS_JSON}'`
+  );
+  const resp = await fetch(
+    `https://www.googleapis.com/drive/v3/files?q=${query}&fields=files(id)`,
+    {headers:{Authorization:'Bearer '+driveToken}}
+  );
+  const data  = await resp.json();
+  const exist = (data.files||[])[0];
+
+  if(exist){
+    await fetch(
+      `https://www.googleapis.com/upload/drive/v3/files/${exist.id}?uploadType=media`,
+      {method:'PATCH', headers:{Authorization:'Bearer '+driveToken,'Content-Type':'application/json'}, body:blob}
+    );
+  } else {
+    const boundary = 'sec_boundary_'+Date.now();
+    const meta = JSON.stringify({name:SECRETARIOS_JSON, parents:[DRIVE_FOLDER_ID]});
+    const body = ['--'+boundary,'Content-Type: application/json; charset=UTF-8','',meta,
+                  '--'+boundary,'Content-Type: application/json; charset=utf-8','',content,
+                  '--'+boundary+'--'].join('\r\n');
+    await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+      method:'POST',
+      headers:{Authorization:'Bearer '+driveToken,'Content-Type':'multipart/related; boundary='+boundary},
+      body,
+    });
+  }
+}
+
+/* ── Renderizar panel de secretarios (en tab Bio) ── */
+async function renderPanelSecretarios(){
+  const cont = document.getElementById('secListado');
+  if(!cont) return;
+  if(!driveToken){
+    cont.innerHTML = '<div style="color:var(--muted);font-size:.82rem">Conectá Google Drive para gestionar secretarios.</div>';
+    return;
+  }
+  cont.innerHTML = '<div style="font-size:.8rem;color:var(--muted)">🔍 Cargando…</div>';
+  try{
+    const lista = await fetchSecretarios();
+    if(lista.length === 0){
+      cont.innerHTML = '<div style="color:var(--muted);font-size:.82rem;padding:10px">No hay secretarios autorizados aún. Agregá el primero abajo.</div>';
+      return;
+    }
+    cont.innerHTML = lista.map((u,i) => `
+      <div class="sec-row">
+        <div>
+          <div class="sec-info">👤 ${u.nombre||'—'} <span style="font-family:monospace;color:var(--muted)">· Legajo: ${u.legajo}</span></div>
+          <div class="sec-meta">🏥 ${u.servicio ? SERVICIOS.find(s=>s.c===u.servicio)?.n||u.servicio : 'Todos los servicios'}</div>
+        </div>
+        <div class="sec-actions">
+          <button class="btn btn-outline btn-sm" onclick="cambiarPasswordSecretario(${i})">🔑 Cambiar clave</button>
+          <button class="btn btn-red btn-sm" onclick="eliminarSecretario(${i})">🗑 Eliminar</button>
+        </div>
+      </div>
+    `).join('');
+  } catch(e){
+    cont.innerHTML = `<div style="color:var(--egreso);font-size:.82rem">Error: ${e.message}</div>`;
+  }
+}
+
+/* ── Agregar secretario ── */
+async function agregarSecretario(){
+  const legajo  = (document.getElementById('secLegajo').value||'').trim();
+  const nombre  = (document.getElementById('secNombre').value||'').trim().toUpperCase();
+  const servicio= (document.getElementById('secServicio').value||'').trim();
+  const pass    = (document.getElementById('secPassword').value||'').trim();
+
+  if(!legajo||!nombre||!pass){ alert('Legajo, Nombre y Contraseña son obligatorios.'); return; }
+  if(pass.length < 6){ alert('La contraseña debe tener al menos 6 caracteres.'); return; }
+  if(!driveToken){ alert('Conectá Google Drive primero.'); return; }
+
+  try{
+    const lista = await fetchSecretarios();
+    if(lista.find(u=>String(u.legajo)===String(legajo))){
+      alert('Ya existe un secretario con ese legajo.'); return;
+    }
+    const hash = await hashPassword(pass);
+    lista.push({legajo, nombre, servicio, password_hash:hash, creado: new Date().toISOString()});
+    await saveSecretarios(lista);
+    ['secLegajo','secNombre','secPassword'].forEach(id=>document.getElementById(id).value='');
+    document.getElementById('secServicio').value='';
+    alert(`✅ Secretario "${nombre}" agregado correctamente.`);
+    renderPanelSecretarios();
+  } catch(e){
+    alert('Error al guardar: '+e.message);
+  }
+}
+
+/* ── Cambiar contraseña ── */
+async function cambiarPasswordSecretario(idx){
+  const nueva = prompt('Nueva contraseña (mínimo 6 caracteres):');
+  if(!nueva||nueva.length<6){ alert('Contraseña muy corta o cancelado.'); return; }
+  try{
+    const lista = await fetchSecretarios();
+    lista[idx].password_hash = await hashPassword(nueva);
+    lista[idx].modificado    = new Date().toISOString();
+    await saveSecretarios(lista);
+    alert('✅ Contraseña actualizada.');
+    renderPanelSecretarios();
+  } catch(e){ alert('Error: '+e.message); }
+}
+
+/* ── Eliminar secretario ── */
+async function eliminarSecretario(idx){
+  const lista = await fetchSecretarios();
+  if(!confirm(`¿Eliminar a "${lista[idx]?.nombre}"?`)) return;
+  lista.splice(idx,1);
+  try{
+    await saveSecretarios(lista);
+    alert('✅ Secretario eliminado.');
+    renderPanelSecretarios();
+  } catch(e){ alert('Error: '+e.message); }
+}
+
+/* ── Verificar sesión guardada al iniciar ── */
+function verificarSesion(){
+  // Modo secretario: sesión en sessionStorage
+  const sesRaw = sessionStorage.getItem('censo_user');
+  if(sesRaw){
+    try{
+      currentUser = JSON.parse(sesRaw);
+      if(currentUser?.rol === 'secretario'){
+        // Necesitamos Drive también para el secretario
+        if(driveToken){
+          aplicarModo('secretario');
+          return true;
+        } else {
+          // Limpiar sesión si no hay Drive
+          sessionStorage.removeItem('censo_user');
+          currentUser = null;
+        }
+      }
+    } catch(e){}
+  }
+  return false;
+}
+
+/* ── Override de onTokenResponse para detectar login admin ── */
+const _origOnTokenResponse = onTokenResponse;
+// Se reemplaza abajo en init
 
 /* ── START ───────────────────────────────────────────── */
 init();
